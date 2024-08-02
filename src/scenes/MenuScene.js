@@ -31,7 +31,7 @@ export class MenuScene extends Scene {
             this.scale.width / 2,
             this.scale.height / 2,
             "knighthawks",
-            "DAASER'S\nHUYDQ",
+            "DAASER'S\nSPACESHIP'S VIETNAM",
             52,
             1
         )
