@@ -14,7 +14,7 @@ export class Player extends Physics.Arcade.Image {
         this.scene = scene;
         this.scene.add.existing(this);
         this.scene.physics.add.existing(this);
-        this.setSize(1, 1);
+        this.setSize(2, 2);
         this.propulsion_fire = this.scene.add.sprite(this.x - 32, this.y, "propulsion-fire");
         this.propulsion_fire.play("fire");
 
