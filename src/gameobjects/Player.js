@@ -1,4 +1,4 @@
-import { GameObjects, Physics } from "phaser";
+import { Physics } from "phaser";
 import { Bullet } from "./Bullet";
 
 export class Player extends Physics.Arcade.Image {
@@ -14,11 +14,10 @@ export class Player extends Physics.Arcade.Image {
         this.scene = scene;
         this.scene.add.existing(this);
         this.scene.physics.add.existing(this);
-
+        this.setSize(1, 1);
         this.propulsion_fire = this.scene.add.sprite(this.x - 32, this.y, "propulsion-fire");
         this.propulsion_fire.play("fire");
 
-        // Bullets group to create pool
         this.bullets = this.scene.physics.add.group({
             classType: Bullet,
             maxSize: 100,
@@ -74,6 +73,12 @@ export class Player extends Physics.Arcade.Image {
                 this.updatePropulsionFire();
             } else if (direction === "down" && this.y + 75 < this.scene.scale.height) {
                 this.y += 5;
+                this.updatePropulsionFire();
+            } else if (direction === "left" && this.x - 10 > 0) {
+                this.x -= 5;
+                this.updatePropulsionFire();
+            } else if (direction === "right" && this.x + 50 < this.scene.scale.width) {
+                this.x += 5;
                 this.updatePropulsionFire();
             }
         }

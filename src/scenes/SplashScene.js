@@ -6,13 +6,13 @@ export class SplashScene extends Scene {
         super("SplashScene");
     }
 
-    init() {
-        this.cameras.main.fadeIn(1000, 0, 0, 0);   
-    }
+    // init() {
+    //     this.cameras.main.fadeIn(1000, 0, 0, 0);   
+    // }
 
     create() {
         const logo = this.add.image(this.scale.width / 2, this.scale.height / 2, "logo");
-        const fx = logo.postFX.addShine(1, .2, 5);
+        // const fx = logo.postFX.addShine(1, .2, 5);
         
         this.time.addEvent({
             delay: 2000,

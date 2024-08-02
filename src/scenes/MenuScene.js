@@ -11,7 +11,6 @@ export class MenuScene extends Scene {
 
     create() {
 
-        // Background rectangles
         this.add.rectangle(
             0,
             this.scale.height / 2,
@@ -32,7 +31,7 @@ export class MenuScene extends Scene {
             this.scale.width / 2,
             this.scale.height / 2,
             "knighthawks",
-            "PHASER'S\nREVENGE",
+            "DAASER'S\nHUYDQ",
             52,
             1
         )
@@ -43,7 +42,7 @@ export class MenuScene extends Scene {
             this.scale.width / 2,
             this.scale.height / 2 + 85,
             "pixelfont",
-            "CLICK TO START",
+            "START",
             24
         ).setOrigin(0.5, 0.5);
         
@@ -58,7 +57,6 @@ export class MenuScene extends Scene {
             repeat: -1
         });
 
-        // Send start-game event when user clicks
         this.input.on("pointerdown", () => {
             this.game.events.emit("start-game");
         });

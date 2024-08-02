@@ -76,7 +76,7 @@ export class MainScene extends Scene {
                 loop: true,
                 callback: () => {
                     if (this.game_over_timeout === 0) {
-                        // You need remove the event listener to avoid duplicate events.
+                        // remove the event listener to avoid duplicate events.
                         this.game.events.removeListener("start-game");
                         // It is necessary to stop the scenes launched in parallel.
                         this.scene.stop("HudScene");
@@ -101,6 +101,11 @@ export class MainScene extends Scene {
         if (this.cursors.down.isDown) {
             this.player.move("down");
         }
-
+        if (this.cursors.left.isDown) {
+            this.player.move("left");
+        }
+        if (this.cursors.right.isDown) {
+            this.player.move("right");
+        }
     }
 }
