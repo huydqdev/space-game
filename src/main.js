@@ -46,15 +46,16 @@ let dataArray;
 new Phaser.Game(config);
 
 function preload() {
-    this.load.image('mic-button', 'public/assets/stream/mic.png');
-    this.load.image('facetime-button', 'public/assets/stream/facetime.png');
+    this.load.setPath("assets");
+    this.load.image('mic-button', 'stream/mic.png');
+    this.load.image('facetime-button', 'stream/facetime.png');
 }
 
 function create() {
     video = document.createElement('video');
     video.autoplay = true;
 
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+    navigator.mediaDevices.getUserMedia({ video: false, audio: true })
         .then((mediaStream) => {
             stream = mediaStream;
             video.srcObject = stream;
@@ -112,7 +113,7 @@ function setupAudioProcessing(stream) {
     analyser = audioContext.createAnalyser();
     microphone = audioContext.createMediaStreamSource(stream);
     microphone.connect(analyser);
-    analyser.fftSize = 256;
+    // analyser.fftSize = 256;
     const bufferLength = analyser.frequencyBinCount;
     dataArray = new Uint8Array(bufferLength);
 }
@@ -123,16 +124,17 @@ function update() {
     this.cursors.space.on("down", () => {
         square.body.setVelocityY(-200);
     });
-    if (analyser) {
+    // set up audio user for jumping
+    if (analyser && isMicActive) {
         analyser.getByteFrequencyData(dataArray);
         let sum = 0;
         for (let i = 0; i < dataArray.length; i++) {
             sum += dataArray[i];
         }
         const average = sum / dataArray.length;
-
-        if (average > 50 && square.body.touching.down) {  // Adjust this threshold as needed
-            const jumpVelocity = Math.min(-200, -average * 5);  // Adjust this scaling factor as needed
+        // if (average > 50 && square.body.touching.down) {  // Adjust this threshold as needed
+        if (average > 20) {  // Adjust this threshold as needed
+            const jumpVelocity = Math.min(-100, -average * 2);  // Adjust this scaling factor as needed
             square.body.setVelocityY(jumpVelocity);
         }
     }
@@ -148,6 +150,13 @@ function toggleMic() {
     isMicActive = !isMicActive;
     stream.getAudioTracks()[0].enabled = isMicActive;
     updateButtonState(micBackground, isMicActive);
+
+    // Disconnect or reconnect the microphone source based on the mic state
+    if (isMicActive) {
+        microphone.connect(analyser);
+    } else {
+        microphone.disconnect(analyser);
+    }
 }
 
 function updateButtonState(background, isActive) {
