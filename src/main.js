@@ -1,9 +1,9 @@
 const config = {
     type: Phaser.AUTO,
     parent: "phaser-container",
-    backgroundColor: '0xffffff',
-    width: 800,
-    height: 600,
+    backgroundColor: '0x000000',
+    width: 512,
+    height: 512,
     max: {
         width: 1000,
         height: 600,
@@ -15,7 +15,7 @@ const config = {
     physics: {
         default: 'arcade',
         arcade: {
-            gravity: { y: 300 },
+            gravity: { y: 0 },
             debug: false
         }
     },
@@ -43,69 +43,67 @@ let analyser;
 let microphone;
 let dataArray;
 
+let recognition;
+
+
+
+// Predefined words to compare with
+const predefinedWords = ['buy', 'hello', 'nice'];
+
+// Variables to store UI elements and game states
+let promptWord;
+let startButton;
+
+
+// init game 
+let bird;
+let gates;
+let shouldSpawnGate = true;
+let birdSpeed = 100;
+let currentWordIndex = 0;
+
 new Phaser.Game(config);
 
 function preload() {
     this.load.setPath("assets");
     this.load.image('mic-button', 'stream/mic.png');
     this.load.image('facetime-button', 'stream/facetime.png');
+    this.load.image('bird', 'bird-scream/bird.png');
+    this.load.image('forest-bg', 'bird-scream/forest_bg.png');
+    this.load.image('floor-bg', 'floor.png');
+    this.load.image('gate', 'bird-scream/gate.png');
 }
 
 function create() {
+    checkRecognition();
     video = document.createElement('video');
-    video.autoplay = true;
+    video.autoplay = false;
+    setupGame.call(this);
+}
 
-    navigator.mediaDevices.getUserMedia({ video: false, audio: true })
-        .then((mediaStream) => {
-            stream = mediaStream;
-            video.srcObject = stream;
+function setupGame() {
+    let background = this.add.image(0, 0, 'forest-bg').setOrigin(0);
+    let scaleY = this.cameras.main.height / background.height;
+    background.setScale(scaleY).setScrollFactor(0);
+    this.background = this.add.tileSprite(0, 0, config.width, config.height, 'floor-bg');
+    this.background.setOrigin(0, 0);
+    // this.background.setScrollFactor(0);
+    //
+    bird = this.physics.add.sprite(50, 300, 'bird');
+    bird.setDisplaySize(50, 50);
+    bird.setCollideWorldBounds(false);
+    bird.setVelocityX(birdSpeed);
 
-            video.addEventListener('loadedmetadata', () => {
-                console.log('Video metadata loaded!');
-                videoTexture = this.textures.createCanvas('videoTextureE', 800, 540);
-                videoImage = this.add.image(400, 270, 'videoTextureE');
+    // Set up camera to follow bird
+    this.cameras.main.startFollow(bird);
+    this.cameras.main.setFollowOffset(-200, 0);
+    this.cameras.main.setLerp(0.05, 0);
 
-                const context = videoTexture.getContext();
+    // Create gates group
+    gates = this.physics.add.group();
 
-                this.time.addEvent({
-                    delay: 30,
-                    loop: true,
-                    callback: () => {
-                        if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                            context.drawImage(video, 0, 0, 800, 540);
-                            videoTexture.refresh();
-                        }
-                    }
-                });
-
-                // Create buttons with backgrounds
-                const buttonY = 570;  // New Y position for buttons (10px below video)
-                cameraBackground = this.add.circle(300, buttonY, 30, 0xffffff);
-                micBackground = this.add.circle(500, buttonY, 30, 0xffffff);
-                cameraButton = this.add.image(300, buttonY, 'facetime-button').setInteractive();
-                micButton = this.add.image(500, buttonY, 'mic-button').setInteractive();
-
-                cameraButton.setScale(0.07);
-                micButton.setScale(0.07);
-
-                cameraButton.on('pointerdown', toggleCamera);
-                micButton.on('pointerdown', toggleMic);
-
-                // Set initial states
-                updateButtonState(cameraBackground, isCameraActive);
-                updateButtonState(micBackground, isMicActive);
-
-                // Create the red square
-                square = this.add.rectangle(400, 270, 15, 15, 0xff0000);
-                this.physics.add.existing(square);
-                square.body.setCollideWorldBounds(true);
-
-                setupAudioProcessing(mediaStream);
-            });
-        })
-        .catch((error) => {
-            console.error('Error accessing camera:', error);
-        });
+    // Add collision between bird and gates
+    this.physics.add.collider(bird, gates, hitGate, null, this);
 }
 
 function setupAudioProcessing(stream) {
@@ -133,11 +131,16 @@ function update() {
         }
         const average = sum / dataArray.length;
         // if (average > 50 && square.body.touching.down) {  // Adjust this threshold as needed
-        if (average > 20) {  // Adjust this threshold as needed
+        if (average > 25) {  // Adjust this threshold as needed
             const jumpVelocity = Math.min(-100, -average * 2);  // Adjust this scaling factor as needed
             square.body.setVelocityY(jumpVelocity);
         }
     }
+    
+    // set up background game
+    // this.cameras.main.setBounds(0, 0, this.bird.x + this.cameras.main.width, this.cameras.main.height);
+    // this.background.tilePositionX += 2;
+    
 }
 
 function toggleCamera() {
@@ -154,11 +157,77 @@ function toggleMic() {
     // Disconnect or reconnect the microphone source based on the mic state
     if (isMicActive) {
         microphone.connect(analyser);
+        startRecognition();
     } else {
         microphone.disconnect(analyser);
     }
 }
 
 function updateButtonState(background, isActive) {
-    background.setFillStyle(isActive ? 0xcccccc : 0xff0000);  
+    background.setFillStyle(isActive ? 0xcccccc : 0xff0000);
+}
+
+function checkRecognition(){
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechGrammarList = window.SpeechGrammarList || window.webkitSpeechGrammarList;
+    const SpeechRecognitionEvent = window.SpeechRecognitionEvent || window.webkitSpeechRecognitionEvent;
+
+    let speechRecognitionList = new SpeechGrammarList();
+    if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.interimResults = true;
+        recognition.continuous = true;
+        recognition.lang = "en-US";
+        recognition.maxAlternatives = 1; // default value
+        console.log('Speech Recognition supported in this browser:');
+    } else {
+        console.error('Speech Recognition not supported in this browser');
+    }
+}
+
+function startRecognition(){
+    // Get a random word for the player to speak
+    promptWord = Phaser.Utils.Array.GetRandom(predefinedWords);
+    if (recognition) {
+        recognition.start(); // when recognition start
+        console.log('======promptWord: ',promptWord)
+        recognition.onresult = (event) => {
+            const recognizedText = event.results[0][0].transcript.trim().toLowerCase();
+            console.log('======results: ', event.results);
+            checkAnswer(recognizedText);
+        };
+
+        recognition.onerror = (event) => {
+            recognition.onspeechend = () => {
+                recognition.stop();
+            };
+        };
+    }
+}
+
+function checkAnswer(recognizedText) {
+    if (recognizedText === promptWord) {
+        console.log('Correct! Well done!')
+    } else {
+        console.log('Incorrect! You said: "${recognizedText}". Try again!')
+        startRecognition();
+    }
+}
+
+function hitGate(bird, gate) {
+    // Decrease gate health
+    gate.health--;
+    if (gate.health <= 0) {
+        gate.destroy();
+        this.shouldSpawnGate = true;
+        // Immediately set the bird's velocity back to its normal speed
+        bird.setVelocityX(this.birdSpeed);
+    } else {
+        // Bounce the bird back
+        bird.setVelocityX(-150);
+        // Move the bird forward again after a short delay
+        this.time.delayedCall(500, () => {
+            bird.setVelocityX(this.birdSpeed);
+        });
+    }
 }
