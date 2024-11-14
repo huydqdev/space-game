@@ -1,233 +1,236 @@
+export class Example extends Phaser.Scene {
+    constructor() {
+        super()
+        this.leaves = []
+        this.currentLeafIndex = 0
+        this.micActive = false
+        this.targetWord = null
+        this.recognition = null // For speech recognition
+        this.infoBoxOpen = false // Track whether the infoBox is open
+        this.scrollSpeed = 5 // Adjust scroll speed
+        this.score = 0 // Initialize score
+        this.words = ['Joy', 'Nature', 'Life', 'Harmony', 'Balance', 'Peace', 'Wisdom', 'Strength', 'Growth', 'Unity']
+    }
+
+    preload() {
+        this.load.image('clouds', 'https://play.rosebud.ai/assets/Big Clouds Blended.png?nvxB')
+        this.load.image('beanstalk', 'https://play.rosebud.ai/assets/beanstalk_bg.png?aMkx')
+        this.load.image('leaf_left', 'https://play.rosebud.ai/assets/leaf_left.png?cvCX')
+        this.load.image('leaf_right', 'https://play.rosebud.ai/assets/leaf_right.png?06Jz')
+        this.load.image('inactive_mic', 'https://play.rosebud.ai/assets/inactive_mic.png?nVkQ')
+        this.load.image('active_mic', 'https://play.rosebud.ai/assets/active_mic.png?xI9S')
+        this.load.image('bird_player', 'https://play.rosebud.ai/assets/A cartoon-style bird GIF with flapping wings.png?Ny5s')
+    }
+
+    create() {
+        this.checkRecognition()
+
+        // Add background and other visual elements
+        const beanstalk = this.add.image(0, 0, 'beanstalk').setOrigin(0)
+        beanstalk.setScale(1.2)
+        this.cameras.main.setBounds(0, 0, beanstalk.width * 1.2, beanstalk.height * 1.2)
+        this.cameras.main.scrollY = beanstalk.height * 1.2 - this.cameras.main.height
+        this.clouds = this.add.tileSprite(0, 0, 500, 100, 'clouds').setOrigin(0).setScale(2.5)
+
+        // Define leaves with words
+        const leafPositions = [
+            { x: 270, y: 900, side: 'left' }, { x: 250, y: 700, side: 'left' },
+            { x: 200, y: 600, side: 'left' }, { x: 250, y: 500, side: 'left' },
+            { x: 200, y: 300, side: 'left' }, { x: 400, y: 950, side: 'right' },
+            { x: 380, y: 750, side: 'right' }, { x: 395, y: 650, side: 'right' },
+            { x: 320, y: 550, side: 'right' }, { x: 390, y: 350, side: 'right' }
+        ]
+        leafPositions.forEach((position, index) => {
+            const leafKey = position.side === 'left' ? 'leaf_left' : 'leaf_right'
+            const leaf = this.add.image(position.x, position.y, leafKey).setScale(0.1)
+            leaf.word = this.words[index % this.words.length]
+
+            // Add animations and interactions
+            this.tweens.add({
+                targets: leaf,
+                alpha: { start: 0.8, to: 1 },
+                x: `+=${position.side === 'left' ? -4 : 4}`,
+                y: '+=4',
+                duration: 1000,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            })
+            leaf.setInteractive()
+            leaf.on('pointerover', () => leaf.setTint(0x88ff88))
+            leaf.on('pointerout', () => leaf.clearTint())
+            this.leaves.push(leaf)
+        })
+
+        // Add mic icon
+        const { width, height } = this.sys.game.config
+        this.micIcon = this.add.image(width / 2, height - 50, 'inactive_mic').setScale(0.1)
+        this.micIcon.setScrollFactor(0)
+        this.micIcon.setInteractive()
+        this.micIcon.on('pointerdown', (pointer, localX, localY, event) => {
+            event.stopPropagation() // Prevent mic click from closing the infoBox
+            this.toggleMic()
+        })
+
+        // Score display in top-left corner
+        this.scoreText = this.add.text(40, 10, `Score: ${this.score}`, {
+            fontSize: '20px',
+            color: '#ffffff',
+            align: 'left'
+        }).setScrollFactor(0)
+
+        // Show the first word after 2 seconds
+        this.time.delayedCall(2000, () => {
+            this.showInfoBox(this.leaves[this.currentLeafIndex].word)
+        })
+
+        // Close infoBox when clicking outside
+        this.input.on('pointerdown', (pointer) => {
+            if (this.infoBoxOpen && !this.infoBoxBounds.contains(pointer.x, pointer.y)) {
+                this.closeInfoBox()
+            }
+        })
+
+        this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
+            if (!this.infoBoxOpen) {
+                this.cameras.main.scrollY += deltaY > 0 ? this.scrollSpeed : -this.scrollSpeed
+                this.cameras.main.scrollY = Phaser.Math.Clamp(
+                    this.cameras.main.scrollY,
+                    0,
+                    beanstalk.height * 1.2 - this.cameras.main.height
+                )
+            }
+        })
+    }
+
+    showInfoBox(text) {
+        this.infoBoxOpen = true
+
+        if (!this.infoBox) {
+            const { width, height } = this.sys.game.config
+            this.infoBox = this.add.graphics()
+            this.infoBox.fillStyle(0x000000, 0.7)
+            this.infoBox.fillRoundedRect(width / 2 - 125, height / 2 - 50, 250, 100, 10)
+            this.infoBox.setScrollFactor(0)
+
+            this.infoBoxBounds = new Phaser.Geom.Rectangle(width / 2 - 125, height / 2 - 50, 250, 100)
+            this.infoText = this.add.text(width / 2, height / 2, text, {
+                fontSize: '18px',
+                color: '#ffffff',
+                align: 'center'
+            }).setOrigin(0.5)
+            this.infoText.setScrollFactor(0)
+        } else {
+            this.infoText.setText(text)
+            this.infoBox.setVisible(true)
+            this.infoText.setVisible(true)
+        }
+    }
+
+    closeInfoBox() {
+        if (this.infoBox) {
+            this.infoBox.setVisible(false)
+            this.infoBoxOpen = false
+        }
+        if (this.infoText) this.infoText.setVisible(false)
+    }
+
+    toggleMic() {
+        if (this.micActive) {
+            this.micIcon.setTexture('inactive_mic')
+            this.micActive = false
+            if (this.recognition) this.recognition.stop()
+        } else {
+            this.micIcon.setTexture('active_mic')
+            this.micActive = true
+            this.showInfoBox(this.leaves[this.currentLeafIndex].word)
+            this.startRecognitionForCurrentLeaf()
+        }
+    }
+
+    startRecognitionForCurrentLeaf() {
+        if (this.currentLeafIndex < this.leaves.length) {
+            const leaf = this.leaves[this.currentLeafIndex]
+            this.targetWord = leaf.word
+            this.startRecognition()
+        } else {
+            this.showInfoBox("All words completed!")
+        }
+    }
+
+    checkRecognition() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+        if (SpeechRecognition) {
+            this.recognition = new SpeechRecognition()
+            this.recognition.interimResults = false
+            this.recognition.continuous = true
+            this.recognition.lang = "en-US"
+            this.recognition.maxAlternatives = 1
+            this.recognition.onresult = this.handleSpeechResult.bind(this)
+        } else {
+            console.error('Speech Recognition not supported in this browser')
+        }
+    }
+
+    startRecognition() {
+        if (this.recognition) {
+            this.recognition.start()
+        }
+    }
+
+    handleSpeechResult(event) {
+        const spokenWord = event.results[0][0].transcript.trim().toLowerCase()
+        const targetWordLower = this.targetWord.toLowerCase()
+        const resultText = spokenWord === targetWordLower ? 'Correct! Good job!' : 'Try again!'
+        console.log('===============: ',spokenWord, targetWordLower)
+        this.showInfoBox(resultText)
+
+        if (resultText === 'Correct! Good job!') {
+            this.score += 10
+            this.scoreText.setText(`Score: ${this.score}`)
+
+            setTimeout(() => {
+                this.currentLeafIndex++
+                if (this.currentLeafIndex < this.leaves.length) {
+                    const nextLeaf = this.leaves[this.currentLeafIndex]
+                    const camY = this.cameras.main.scrollY
+                    const camHeight = this.cameras.main.height
+                    const leafY = nextLeaf.y
+
+                    if (leafY < camY || leafY > camY + camHeight) {
+                        this.closeInfoBox()
+                        this.cameras.main.pan(0, leafY - camHeight / 2, 1000, 'Sine.easeInOut', true)
+                        this.cameras.main.once('camerapancomplete', () => {
+                            this.showInfoBox(nextLeaf.word)
+                        })
+                    } else {
+                        this.showInfoBox(nextLeaf.word)
+                    }
+                } else {
+                    this.showInfoBox("All words completed!")
+                }
+            }, 2000)
+        }
+    }
+
+    update() {
+        this.clouds.tilePositionX -= 0.0967
+    }
+}
+
+const container = document.getElementById('phaser-container')
 const config = {
     type: Phaser.AUTO,
-    parent: "phaser-container",
-    backgroundColor: '0x000000',
-    width: 512,
-    height: 512,
-    max: {
-        width: 1000,
-        height: 600,
-    },
+    parent: 'phaser-container',
     scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH
     },
-    physics: {
-        default: 'arcade',
-        arcade: {
-            gravity: { y: 0 },
-            debug: false
-        }
-    },
-    scene: {
-        preload: preload,
-        create: create,
-        update: update
-    }
-};
-
-let video;
-let videoTexture;
-let videoImage;
-let stream;
-let cameraButton;
-let micButton;
-let cameraBackground;
-let micBackground;
-let isCameraActive = true;
-let isMicActive = true;
-let square;
-
-let audioContext;
-let analyser;
-let microphone;
-let dataArray;
-
-let recognition;
-
-
-
-// Predefined words to compare with
-const predefinedWords = ['buy', 'hello', 'nice'];
-
-// Variables to store UI elements and game states
-let promptWord;
-let startButton;
-
-
-// init game 
-let bird;
-let gates;
-let shouldSpawnGate = true;
-let birdSpeed = 100;
-let currentWordIndex = 0;
-
-new Phaser.Game(config);
-
-function preload() {
-    this.load.setPath("assets");
-    this.load.image('mic-button', 'stream/mic.png');
-    this.load.image('facetime-button', 'stream/facetime.png');
-    this.load.image('bird', 'bird-scream/bird.png');
-    this.load.image('forest-bg', 'bird-scream/forest_bg.png');
-    this.load.image('floor-bg', 'floor.png');
-    this.load.image('gate', 'bird-scream/gate.png');
+    width: 600,
+    height: 600,
+    pixelArt: true,
+    crisp: true,
+    scene: Example
 }
 
-function create() {
-    checkRecognition();
-    video = document.createElement('video');
-    video.autoplay = false;
-    setupGame.call(this);
-}
-
-function setupGame() {
-    let background = this.add.image(0, 0, 'forest-bg').setOrigin(0);
-    let scaleY = this.cameras.main.height / background.height;
-    background.setScale(scaleY).setScrollFactor(0);
-    this.background = this.add.tileSprite(0, 0, config.width, config.height, 'floor-bg');
-    this.background.setOrigin(0, 0);
-    // this.background.setScrollFactor(0);
-    //
-    bird = this.physics.add.sprite(50, 300, 'bird');
-    bird.setDisplaySize(50, 50);
-    bird.setCollideWorldBounds(false);
-    bird.setVelocityX(birdSpeed);
-
-    // Set up camera to follow bird
-    this.cameras.main.startFollow(bird);
-    this.cameras.main.setFollowOffset(-200, 0);
-    this.cameras.main.setLerp(0.05, 0);
-
-    // Create gates group
-    gates = this.physics.add.group();
-
-    // Add collision between bird and gates
-    this.physics.add.collider(bird, gates, hitGate, null, this);
-}
-
-function setupAudioProcessing(stream) {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    analyser = audioContext.createAnalyser();
-    microphone = audioContext.createMediaStreamSource(stream);
-    microphone.connect(analyser);
-    // analyser.fftSize = 256;
-    const bufferLength = analyser.frequencyBinCount;
-    dataArray = new Uint8Array(bufferLength);
-}
-
-function update() {
-    // Set up space key for jumping
-    this.cursors = this.input.keyboard.createCursorKeys();
-    this.cursors.space.on("down", () => {
-        square.body.setVelocityY(-200);
-    });
-    // set up audio user for jumping
-    if (analyser && isMicActive) {
-        analyser.getByteFrequencyData(dataArray);
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-            sum += dataArray[i];
-        }
-        const average = sum / dataArray.length;
-        // if (average > 50 && square.body.touching.down) {  // Adjust this threshold as needed
-        if (average > 25) {  // Adjust this threshold as needed
-            const jumpVelocity = Math.min(-100, -average * 2);  // Adjust this scaling factor as needed
-            square.body.setVelocityY(jumpVelocity);
-        }
-    }
-    
-    // set up background game
-    // this.cameras.main.setBounds(0, 0, this.bird.x + this.cameras.main.width, this.cameras.main.height);
-    // this.background.tilePositionX += 2;
-    
-}
-
-function toggleCamera() {
-    isCameraActive = !isCameraActive;
-    stream.getVideoTracks()[0].enabled = isCameraActive;
-    updateButtonState(cameraBackground, isCameraActive);
-}
-
-function toggleMic() {
-    isMicActive = !isMicActive;
-    stream.getAudioTracks()[0].enabled = isMicActive;
-    updateButtonState(micBackground, isMicActive);
-
-    // Disconnect or reconnect the microphone source based on the mic state
-    if (isMicActive) {
-        microphone.connect(analyser);
-        startRecognition();
-    } else {
-        microphone.disconnect(analyser);
-    }
-}
-
-function updateButtonState(background, isActive) {
-    background.setFillStyle(isActive ? 0xcccccc : 0xff0000);
-}
-
-function checkRecognition(){
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const SpeechGrammarList = window.SpeechGrammarList || window.webkitSpeechGrammarList;
-    const SpeechRecognitionEvent = window.SpeechRecognitionEvent || window.webkitSpeechRecognitionEvent;
-
-    let speechRecognitionList = new SpeechGrammarList();
-    if (SpeechRecognition) {
-        recognition = new SpeechRecognition();
-        recognition.interimResults = true;
-        recognition.continuous = true;
-        recognition.lang = "en-US";
-        recognition.maxAlternatives = 1; // default value
-        console.log('Speech Recognition supported in this browser:');
-    } else {
-        console.error('Speech Recognition not supported in this browser');
-    }
-}
-
-function startRecognition(){
-    // Get a random word for the player to speak
-    promptWord = Phaser.Utils.Array.GetRandom(predefinedWords);
-    if (recognition) {
-        recognition.start(); // when recognition start
-        console.log('======promptWord: ',promptWord)
-        recognition.onresult = (event) => {
-            const recognizedText = event.results[0][0].transcript.trim().toLowerCase();
-            console.log('======results: ', event.results);
-            checkAnswer(recognizedText);
-        };
-
-        recognition.onerror = (event) => {
-            recognition.onspeechend = () => {
-                recognition.stop();
-            };
-        };
-    }
-}
-
-function checkAnswer(recognizedText) {
-    if (recognizedText === promptWord) {
-        console.log('Correct! Well done!')
-    } else {
-        console.log('Incorrect! You said: "${recognizedText}". Try again!')
-        startRecognition();
-    }
-}
-
-function hitGate(bird, gate) {
-    // Decrease gate health
-    gate.health--;
-    if (gate.health <= 0) {
-        gate.destroy();
-        this.shouldSpawnGate = true;
-        // Immediately set the bird's velocity back to its normal speed
-        bird.setVelocityX(this.birdSpeed);
-    } else {
-        // Bounce the bird back
-        bird.setVelocityX(-150);
-        // Move the bird forward again after a short delay
-        this.time.delayedCall(500, () => {
-            bird.setVelocityX(this.birdSpeed);
-        });
-    }
-}
+window.phaserGame = new Phaser.Game(config)
